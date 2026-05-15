@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Shell</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            text-transform: uppercase;
+        }
+        .terminal {
+            background: #000;
+            color: #10b981;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 8px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            border: 1px solid #334155;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+        input {
+            background: #334155;
+            color: white;
+            font-family: monospace;
+        }
+        button {
+            background: var(--accent);
+            color: var(--bg);
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--danger);
+            border-radius: 50%;
+        }
+        .status-dot.online { background: #22c55e; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 style="margin:0">Gemini Shell</h2>
+        <div id="status" class="status-dot"></div>
+    </div>
+
+    <!-- System Stats -->
+    <div class="card stats-grid">
+        <div class="stat-item">
+            <div id="cpu-val" class="stat-value">--%</div>
+            <div class="stat-label">CPU</div>
+        </div>
+        <div class="stat-item">
+            <div id="ram-val" class="stat-value">--%</div>
+            <div class="stat-label">RAM</div>
+        </div>
+        <div class="stat-item">
+            <div id="swap-val" class="stat-value">--%</div>
+            <div class="stat-label">Swap</div>
+        </div>
+        <div class="stat-item">
+            <div id="uptime-val" class="stat-value">OK</div>
+            <div class="stat-label">Status</div>
+        </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="card">
+        <div id="output" class="terminal">Welcome to Gemini Shell. Connect via SSH tunnel to begin.</div>
+        <input type="text" id="cmd" placeholder="Enter command..." onkeypress="handleKey(event)">
+        <button onclick="runCmd()">Execute</button>
+    </div>
+
+    <script>
+        // Use relative URL so it works regardless of domain/IP
+        const API_URL = window.location.origin;
+        // In a real app, you could prompt for this or store it in localStorage
+        let API_KEY = localStorage.getItem('gemini_api_key') || "";
+
+        async function fetchStats() {
+            try {
+                // stats is now public, no header needed
+                const res = await fetch(`${API_URL}/stats`);
+                const data = await res.json();
+                document.getElementById('cpu-val').innerText = `${data.cpu}%`;
+                document.getElementById('ram-val').innerText = `${data.ram.percent}%`;
+                document.getElementById('swap-val').innerText = `${data.swap.percent}%`;
+                document.getElementById('status').classList.add('online');
+            } catch (e) {
+                document.getElementById('status').classList.remove('online');
+            }
+        }
+
+        async function runCmd() {
+            if (!API_KEY) {
+                API_KEY = prompt("Enter API Key for Command Execution:");
+                if (API_KEY) localStorage.setItem('gemini_api_key', API_KEY);
+            }
+            if (!API_KEY) return;
+
+            output.innerText += `\n$ ${command}`;
+            cmdInput.value = '';
+
+            try {
+                const res = await fetch(`${API_URL}/exec`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': API_KEY 
+                    },
+                    body: JSON.stringify({ command })
+                });
+                const data = await res.json();
+                output.innerText += `\n${data.stdout}${data.stderr}`;
+                output.scrollTop = output.scrollHeight;
+            } catch (e) {
+                output.innerText += `\nError: Could not connect to backend.`;
+            }
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter') runCmd();
+        }
+
+        // Refresh stats every 5 seconds
+        setInterval(fetchStats, 5000);
+        fetchStats();
+    </script>
+</body>
+</html>
