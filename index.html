@@ -118,66 +118,33 @@
         </div>
     </div>
 
-    <!-- Terminal -->
     <div class="card">
-        <div id="output" class="terminal">Welcome to Gemini Shell. Connect via SSH tunnel to begin.</div>
-        <input type="text" id="cmd" placeholder="Enter command..." onkeypress="handleKey(event)">
-        <button onclick="runCmd()">Execute</button>
+        <div id="output" class="terminal" style="height: auto;">System Monitor Active. Data refreshes based on VPS update interval.</div>
     </div>
 
     <script>
-        // Use relative URL so it works regardless of domain/IP
-        const API_URL = window.location.origin;
-        // In a real app, you could prompt for this or store it in localStorage
-        let API_KEY = localStorage.getItem('gemini_api_key') || "";
+        // Fetch the static JSON file pushed by the VPS
+        const STATS_URL = "stats.json";
 
         async function fetchStats() {
             try {
-                // stats is now public, no header needed
-                const res = await fetch(`${API_URL}/stats`);
+                // Add a cache-buster timestamp to ensure fresh data
+                const res = await fetch(`${STATS_URL}?t=${Date.now()}`);
+                if (!res.ok) throw new Error('Stats file not found');
                 const data = await res.json();
+                
                 document.getElementById('cpu-val').innerText = `${data.cpu}%`;
                 document.getElementById('ram-val').innerText = `${data.ram.percent}%`;
                 document.getElementById('swap-val').innerText = `${data.swap.percent}%`;
                 document.getElementById('status').classList.add('online');
             } catch (e) {
+                console.error(e);
                 document.getElementById('status').classList.remove('online');
             }
         }
 
-        async function runCmd() {
-            if (!API_KEY) {
-                API_KEY = prompt("Enter API Key for Command Execution:");
-                if (API_KEY) localStorage.setItem('gemini_api_key', API_KEY);
-            }
-            if (!API_KEY) return;
-
-            output.innerText += `\n$ ${command}`;
-            cmdInput.value = '';
-
-            try {
-                const res = await fetch(`${API_URL}/exec`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-API-KEY': API_KEY 
-                    },
-                    body: JSON.stringify({ command })
-                });
-                const data = await res.json();
-                output.innerText += `\n${data.stdout}${data.stderr}`;
-                output.scrollTop = output.scrollHeight;
-            } catch (e) {
-                output.innerText += `\nError: Could not connect to backend.`;
-            }
-        }
-
-        function handleKey(e) {
-            if (e.key === 'Enter') runCmd();
-        }
-
-        // Refresh stats every 5 seconds
-        setInterval(fetchStats, 5000);
+        // Refresh stats every 30 seconds
+        setInterval(fetchStats, 30000);
         fetchStats();
     </script>
 </body>
